@@ -1,9 +1,11 @@
-name: DBNet
-base: ['config/icdar2015.yaml']
+name: DBNet_lsvt_border2_thred_fintune
+base: ['config/lsvt_mini_border2.yaml']
 arch:
   type: Model
+  is_binary: True
+  is_thred: True
   backbone:
-    type: deformable_resnet18
+    type: resnet18
     pretrained: true
   neck:
     type: FPN
@@ -37,34 +39,35 @@ optimizer:
 lr_scheduler:
   type: WarmupPolyLR
   args:
-    warmup_epoch: 3
+    warmup_epoch: 0
 trainer:
   seed: 2
-  epochs: 1200
-  log_iter: 10
+  epochs: 120
+  log_iter: 1
   show_images_iter: 50
+  #  resume_checkpoint: 'output/DBNet_lsvt_border2_thred_resnet18_FPN_DBHead/checkpoint/model_latest.pth'
   resume_checkpoint: ''
-  finetune_checkpoint: ''
+  finetune_checkpoint: 'output/DBNet_lsvt_border2_thred_fintune_resnet18_FPN_DBHead/checkpoint/model_latest.pth'
   output_dir: output
-  tensorboard: true
+  tensorboard: False
 dataset:
   train:
     dataset:
       args:
         data_path:
-          - ../datasets/opensource/ic15/db/train.txt
+          - ../datasets/opensource/LSVT/db/train_1000.txt
         img_mode: RGB
     loader:
       batch_size: 1
-      shuffle: true
+      shuffle: False
       pin_memory: true
-      num_workers: 6
+      num_workers: 1
       collate_fn: ''
   validate:
     dataset:
       args:
         data_path:
-          - ../datasets/opensource/ic15/db/test.txt
+          - ../datasets/opensource/LSVT/db/test_200.txt
         pre_processes:
           - type: ResizeShortSize
             args:
@@ -73,7 +76,7 @@ dataset:
         img_mode: RGB
     loader:
       batch_size: 1
-      shuffle: true
+      shuffle: False
       pin_memory: false
-      num_workers: 6
+      num_workers: 16
       collate_fn: ICDARCollectFN

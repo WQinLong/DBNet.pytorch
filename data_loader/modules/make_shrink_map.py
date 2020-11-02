@@ -57,6 +57,8 @@ class MakeShrinkMap():
         mask = np.ones((h, w), dtype=np.float32)
         for i in range(len(text_polys)):
             polygon = text_polys[i]
+            # if polygon.shape[0] != 4:
+            #     print(0)
             height = max(polygon[:, 1]) - min(polygon[:, 1])
             width = max(polygon[:, 0]) - min(polygon[:, 0])
             if ignore_tags[i] or min(height, width) < self.min_text_size:
@@ -86,7 +88,8 @@ class MakeShrinkMap():
             polygon[:, 1] = np.clip(polygon[:, 1], 0, h - 1)
 
         for i in range(len(polygons)):
-            area = self.polygon_area(polygons[i])
+            # area = self.polygon_area(polygons[i])
+            area = 10
             if abs(area) < 1:
                 ignore_tags[i] = True
             if area > 0:

@@ -49,7 +49,8 @@ class ICDARCollectFN:
             for k, v in sample.items():
                 if k not in data_dict:
                     data_dict[k] = []
-                if isinstance(v, (np.ndarray, torch.Tensor, PIL.Image.Image)):
+                # if isinstance(v, (np.ndarray, torch.Tensor, PIL.Image.Image)):
+                if isinstance(v, (torch.Tensor, PIL.Image.Image)):
                     if k not in to_tensor_keys:
                         to_tensor_keys.append(k)
                 data_dict[k].append(v)

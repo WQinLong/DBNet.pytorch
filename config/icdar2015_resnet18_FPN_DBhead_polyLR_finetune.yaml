@@ -38,7 +38,7 @@ lr_scheduler:
   type: StepLR
   args:
     step_size: 10
-    gama: 0.8
+    gamma: 0.8
 trainer:
   seed: 2
   epochs: 500

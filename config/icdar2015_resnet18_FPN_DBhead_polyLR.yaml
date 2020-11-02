@@ -2,6 +2,8 @@ name: DBNet
 base: ['config/icdar2015.yaml']
 arch:
   type: Model
+  is_binary: True
+  is_thred: False
   backbone:
     type: resnet18
     pretrained: true
@@ -46,16 +48,16 @@ trainer:
   resume_checkpoint: ''
   finetune_checkpoint: ''
   output_dir: output
-  tensorboard: true
+  tensorboard: false
 dataset:
   train:
     dataset:
       args:
         data_path:
-          - ./datasets/train.txt
+          - ../datasets/opensource/ic15/db/train.txt
         img_mode: RGB
     loader:
-      batch_size: 1
+      batch_size: 12
       shuffle: true
       pin_memory: true
       num_workers: 6
@@ -64,7 +66,7 @@ dataset:
     dataset:
       args:
         data_path:
-          - ./datasets/test.txt
+          - ../datasets/opensource/ic15/db/test.txt
         pre_processes:
           - type: ResizeShortSize
             args:

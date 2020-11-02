@@ -53,6 +53,11 @@ class BaseDataSet(Dataset):
         try:
             data = copy.deepcopy(self.data_list[index])
             im = cv2.imread(data['img_path'], 1 if self.img_mode != 'GRAY' else 0)
+            # for box in data['text_polys']:
+            #     # if box.shape[0] != 4:
+            #     if 1:
+            #         cv2.imwrite("./tmp_output/"+str(index)+"_img_origin.jpg", im)
+            #         break
             if self.img_mode == 'RGB':
                 im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             data['img'] = im
@@ -61,12 +66,40 @@ class BaseDataSet(Dataset):
 
             if self.transform:
                 data['img'] = self.transform(data['img'])
-            data['text_polys'] = data['text_polys'].tolist()
+            # data['text_polys'] = data['text_polys'].tolist()
             if len(self.filter_keys):
                 data_dict = {}
                 for k, v in data.items():
                     if k not in self.filter_keys:
                         data_dict[k] = v
+                # for box in data['text_polys']:
+                #     # if box.shape[0] != 4:
+                #     if 1:
+                #         import torch
+                #         dtype = data_dict['img'].dtype
+                #         mean = torch.as_tensor([0.485, 0.456, 0.406], dtype=dtype, device=data_dict['img'].device)
+                #         std = torch.as_tensor([0.229, 0.224, 0.225], dtype=dtype, device=data_dict['img'].device)
+                #         if mean.ndim == 1:
+                #             mean = mean[:, None, None]
+                #         if std.ndim == 1:
+                #             std = std[:, None, None]
+                #         img_np = data_dict['img']
+                #         img_np = img_np.mul_(std).add_(mean)
+                #         img_np = img_np.data.cpu().numpy()
+                #         img_np = img_np.transpose(1, 2, 0)
+                #         # img_np = data_dict['img'].transpose(1, 2, 0).mul_(std).add_(mean).data.cup().numpy()
+                #
+                #         cv2.imwrite("./tmp_output/"+str(index)+"_img.jpg", cv2.cvtColor((img_np*255).astype(np.uint8), cv2.COLOR_RGB2BGR))
+                #         threshold_map = data_dict['threshold_map']
+                #         _threshold_map = (threshold_map * 255).astype(np.uint8)
+                #         cv2.imwrite("./tmp_output/"+str(index)+"_threshold_map.jpg", (threshold_map * 255).astype(np.uint8))
+                #         threshold_map = data_dict['threshold_mask']
+                #         cv2.imwrite("./tmp_output/"+str(index)+"_threshold_mask.jpg", (threshold_map * 255).astype(np.uint8))
+                #         threshold_map = data_dict['shrink_map']
+                #         cv2.imwrite("./tmp_output/"+str(index)+"_shrink_map.jpg", (threshold_map * 255).astype(np.uint8))
+                #         threshold_map = data_dict['shrink_mask']
+                #         cv2.imwrite("./tmp_output/"+str(index)+"_shrink_mask.jpg", (threshold_map * 255).astype(np.uint8))
+                #         break
                 return data_dict
             else:
                 return data

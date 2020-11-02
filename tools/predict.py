@@ -34,6 +34,20 @@ def resize_image(img, short_size):
     return resized_img
 
 
+def resize_long_image(img, long_size):
+    height, width, _ = img.shape
+    if height > width:
+        new_height = long_size
+        new_width = new_height / height * width
+    else:
+        new_width = long_size
+        new_height = new_width / width * height
+    new_height = int(round(new_height / 32) * 32)
+    new_width = int(round(new_width / 32) * 32)
+    resized_img = cv2.resize(img, (new_width, new_height))
+    return resized_img
+
+
 class Pytorch_model:
     def __init__(self, model_path, post_p_thre=0.7, gpu_id=None):
         '''
@@ -78,7 +92,8 @@ class Pytorch_model:
         if self.img_mode == 'RGB':
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         h, w = img.shape[:2]
-        img = resize_image(img, short_size)
+        # img = resize_image(img, short_size)
+        img = resize_long_image(img, short_size)
         # 将图片由(w,h)变为(1,img_channel,h,w)
         tensor = self.transform(img)
         tensor = tensor.unsqueeze_(0)
@@ -89,7 +104,7 @@ class Pytorch_model:
             if str(self.device).__contains__('cuda'):
                 torch.cuda.synchronize(self.device)
             start = time.time()
-            preds = self.model(tensor)
+            preds = self.model(tensor, None, is_thred=False, is_binary=False)
             if str(self.device).__contains__('cuda'):
                 torch.cuda.synchronize(self.device)
             box_list, score_list = self.post_process(batch, preds, is_output_polygon=is_output_polygon)

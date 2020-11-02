@@ -32,6 +32,9 @@ class EVAL():
         config = checkpoint['config']
         config['arch']['backbone']['pretrained'] = False
 
+        config['post_processing']['args']['thresh'] = 0.3
+        config['post_processing']['args']['box_thresh'] = 0.7
+
         self.validate_loader = get_dataloader(config['dataset']['validate'], config['distributed'])
 
         self.model = build_model(config['arch'])
@@ -40,6 +43,7 @@ class EVAL():
 
         self.post_process = get_post_processing(config['post_processing'])
         self.metric_cls = get_metric(config['metric'])
+        self.config = config
 
     def eval(self):
         self.model.eval()
@@ -54,12 +58,19 @@ class EVAL():
                     if value is not None:
                         if isinstance(value, torch.Tensor):
                             batch[key] = value.to(self.device)
+                torch.cuda.synchronize()
                 start = time.time()
+                # print("time1: ", time.time())
                 preds = self.model(batch['img'])
+                torch.cuda.synchronize()
+                # print("time2: ", time.time())
                 boxes, scores = self.post_process(batch, preds,is_output_polygon=self.metric_cls.is_output_polygon)
+                # print("time3: ", time.time())
                 total_frame += batch['img'].size()[0]
                 total_time += time.time() - start
-                raw_metric = self.metric_cls.validate_measure(batch, (boxes, scores))
+                raw_metric = self.metric_cls.validate_measure(batch, (boxes, scores),
+                                                              box_thresh=self.config['post_processing']['args'][
+                                                                  'box_thresh'])
                 raw_metrics.append(raw_metric)
         metrics = self.metric_cls.gather_measure(raw_metrics)
         print('FPS:{}'.format(total_frame / total_time))

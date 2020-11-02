@@ -22,10 +22,13 @@ class DBHead(nn.Module):
         self.thresh = self._init_thresh(in_channels)
         self.thresh.apply(self.weights_init)
 
-    def forward(self, x):
+    def forward(self, x, thred, is_thred=False, is_binary=False):
         shrink_maps = self.binarize(x)
-        threshold_maps = self.thresh(x)
-        if self.training:
+        if is_thred:
+            threshold_maps = thred.unsqueeze(1)
+        else:
+            threshold_maps = self.thresh(x)
+        if self.training and is_binary:
             binary_maps = self.step_function(shrink_maps, threshold_maps)
             y = torch.cat((shrink_maps, threshold_maps, binary_maps), dim=1)
         else:

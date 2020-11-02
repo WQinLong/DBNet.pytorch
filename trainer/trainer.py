@@ -9,11 +9,15 @@ from tqdm import tqdm
 
 from base import BaseTrainer
 from utils import WarmupPolyLR, runningScore, cal_text_score
+import cv2
+import numpy as np
 
 
 class Trainer(BaseTrainer):
-    def __init__(self, config, model, criterion, train_loader, validate_loader, metric_cls, post_process=None):
-        super(Trainer, self).__init__(config, model, criterion)
+    def __init__(self, config, model, criterion, train_loader, validate_loader, metric_cls, logger=None,
+                 post_process=None):
+        super(Trainer, self).__init__(config, model, criterion, logger)
+        self.index = 0
         self.show_images_iter = self.config['trainer']['show_images_iter']
         self.train_loader = train_loader
         if validate_loader is not None:
@@ -56,7 +60,19 @@ class Trainer(BaseTrainer):
                         batch[key] = value.to(self.device)
             cur_batch_size = batch['img'].size()[0]
 
-            preds = self.model(batch['img'])
+            preds = self.model(batch['img'], batch['threshold_map'], is_thred=self.config['arch']['is_thred'],
+                               is_binary=self.config['arch']['is_binary'])
+
+            # for j in range(preds.shape[0]):
+            #     shrink_maps = preds[j, 0, :, :].data.cpu().numpy()
+            #     cv2.imwrite("./tmp_output/" + str(self.index) + "_shrink_mask_train_.jpg", (shrink_maps * 255).astype(np.uint8))
+            #     threshold_maps = preds[j, 1, :, :].data.cpu().numpy()
+            #     cv2.imwrite("./tmp_output/" + str(self.index) + "_threshold_maps_train.jpg", (threshold_maps * 255).astype(np.uint8))
+            #     if preds.size()[1] > 2:
+            #         binary_maps = preds[j, 2, :, :].data.cpu().numpy()
+            #         cv2.imwrite("./tmp_output/" + str(self.index) + "_binary_maps_train.jpg", (binary_maps * 255).astype(np.uint8))
+            #
+            #     self.index += 1
             loss_dict = self.criterion(preds, batch)
             # backward
             self.optimizer.zero_grad()
@@ -133,17 +149,21 @@ class Trainer(BaseTrainer):
                         if isinstance(value, torch.Tensor):
                             batch[key] = value.to(self.device)
                 start = time.time()
-                preds = self.model(batch['img'])
+                preds = self.model(batch['img'], None, is_thred=False, is_binary=self.config['arch']['is_binary'])
                 boxes, scores = self.post_process(batch, preds,is_output_polygon=self.metric_cls.is_output_polygon)
                 total_frame += batch['img'].size()[0]
                 total_time += time.time() - start
-                raw_metric = self.metric_cls.validate_measure(batch, (boxes, scores))
+                raw_metric = self.metric_cls.validate_measure(batch, (boxes, scores),
+                                                              box_thresh=self.config['post_processing']['args'][
+                                                                  'box_thresh'])
                 raw_metrics.append(raw_metric)
         metrics = self.metric_cls.gather_measure(raw_metrics)
         self.logger_info('FPS:{}'.format(total_frame / total_time))
         return metrics['recall'].avg, metrics['precision'].avg, metrics['fmeasure'].avg
 
     def _on_epoch_finish(self):
+        if self.config['notest'] and self.epoch_result['epoch'] != self.epochs:
+            return (0, 0, 0)
         self.logger_info('[{}/{}], train_loss: {:.4f}, time: {:.4f}, lr: {}'.format(
             self.epoch_result['epoch'], self.epochs, self.epoch_result['train_loss'], self.epoch_result['time'],
             self.epoch_result['lr']))
@@ -174,6 +194,7 @@ class Trainer(BaseTrainer):
                     save_best = True
                     self.metrics['train_loss'] = self.epoch_result['train_loss']
                     self.metrics['best_model_epoch'] = self.epoch_result['epoch']
+                    recall, precision, hmean = 0, 0, 0
             best_str = 'current best, '
             for k, v in self.metrics.items():
                 best_str += '{}: {:.6f}, '.format(k, v)
@@ -185,6 +206,7 @@ class Trainer(BaseTrainer):
             else:
                 self.logger_info("Saving checkpoint: {}".format(net_save_path))
 
+            return (recall, precision, hmean)
 
     def _on_train_finish(self):
         for k, v in self.metrics.items():

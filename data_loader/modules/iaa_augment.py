@@ -53,12 +53,13 @@ class IaaAugment():
         for poly in data['text_polys']:
             new_poly = self.may_augment_poly(aug, shape, poly)
             line_polys.append(new_poly)
-        data['text_polys'] = np.array(line_polys)
+        # data['text_polys'] = np.array(line_polys)
+        data['text_polys'] = line_polys
         return data
 
     def may_augment_poly(self, aug, img_shape, poly):
         keypoints = [imgaug.Keypoint(p[0], p[1]) for p in poly]
         keypoints = aug.augment_keypoints(
             [imgaug.KeypointsOnImage(keypoints, shape=img_shape)])[0].keypoints
-        poly = [(p.x, p.y) for p in keypoints]
-        return poly
+        poly = [[p.x, p.y] for p in keypoints]
+        return np.array(poly)

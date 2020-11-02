@@ -1,8 +1,8 @@
-name: DBNet
+name: DBNet_lsvt_border2_thred_fintune
 dataset:
   train:
     dataset:
-      type: ICDAR2015Dataset # 数据集类型
+      type: LSVTDataset # 数据集类型
       args:
         data_path: # 一个存放 img_path \t gt_path的文件
           - ''
@@ -16,9 +16,13 @@ dataset:
             args:
               size: [640,640]
               max_tries: 50
+              min_crop_side_ratio: 0.6
               keep_ratio: true
-              min_crop_side_ratio: 0.4
-          - type: MakeBorderMap
+          #          - type: ResizeAndPad
+          #            args:
+          #              size: [640,640]
+          #              keep_ratio: true
+          - type: MakeBorderMap2
             args:
               shrink_ratio: 0.4
               thresh_min: 0.3
@@ -34,6 +38,8 @@ dataset:
             args:
               mean: [0.485, 0.456, 0.406]
               std: [0.229, 0.224, 0.225]
+        #              mean: [0, 0, 0]
+        #              std: [1, 1, 1]
         img_mode: RGB
         filter_keys: [img_path,img_name,text_polys,texts,ignore_tags,shape] # 返回数据之前，从数据字典里删除的key
         ignore_tags: ['*', '###']
@@ -45,7 +51,7 @@ dataset:
       collate_fn: ''
   validate:
     dataset:
-      type: ICDAR2015Dataset
+      type: LSVTDataset
       args:
         data_path:
           - ''

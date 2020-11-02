@@ -14,11 +14,11 @@ from utils import setup_logger
 
 
 class BaseTrainer:
-    def __init__(self, config, model, criterion):
+    def __init__(self, config, model, criterion, logger=None):
         config['trainer']['output_dir'] = os.path.join(str(pathlib.Path(os.path.abspath(__name__)).parent),
                                                        config['trainer']['output_dir'])
-        config['name'] = config['name'] + '_' + model.name
-        self.save_dir = os.path.join(config['trainer']['output_dir'], config['name'])
+        self.model_name = config['name'] + '_' + model.name
+        self.save_dir = os.path.join(config['trainer']['output_dir'], self.model_name)
         self.checkpoint_dir = os.path.join(self.save_dir, 'checkpoint')
 
         if config['trainer']['resume_checkpoint'] == '' and config['trainer']['finetune_checkpoint'] == '':
@@ -37,7 +37,8 @@ class BaseTrainer:
         self.log_iter = self.config['trainer']['log_iter']
         if config['local_rank'] == 0:
             anyconfig.dump(config, os.path.join(self.save_dir, 'config.yaml'))
-            self.logger = setup_logger(os.path.join(self.save_dir, 'train.log'))
+            # self.logger = setup_logger(os.path.join(self.save_dir, 'train.log'))
+            self.logger = logger
             self.logger_info(pformat(self.config))
 
         # device
@@ -104,10 +105,11 @@ class BaseTrainer:
             self.epoch_result = self._train_epoch(epoch)
             if self.config['lr_scheduler']['type'] != 'WarmupPolyLR':
                 self.scheduler.step()
-            self._on_epoch_finish()
+            results = self._on_epoch_finish()
         if self.config['local_rank'] == 0 and self.tensorboard_enable:
             self.writer.close()
         self._on_train_finish()
+        return results
 
     def _train_epoch(self, epoch):
         """

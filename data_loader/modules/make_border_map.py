@@ -5,6 +5,60 @@ import pyclipper
 from shapely.geometry import Polygon
 
 
+def shrink_polygon_pyclipper(polygon, shrink_ratio):
+    from shapely.geometry import Polygon
+    import pyclipper
+    polygon_shape = Polygon(polygon)
+    distance = polygon_shape.area * (1 - np.power(shrink_ratio, 2)) / polygon_shape.length
+    subject = [tuple(l) for l in polygon]
+    padding = pyclipper.PyclipperOffset()
+    padding.AddPath(subject, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+    shrinked = padding.Execute(-distance)
+    if shrinked == []:
+        shrinked = np.array(shrinked)
+    else:
+        shrinked = np.array(shrinked[0]).reshape(-1, 2)
+    return shrinked
+
+
+class MakeBorderMap2():
+    def __init__(self, shrink_ratio=0.4, thresh_min=0.3, thresh_max=0.7):
+        self.shrink_ratio = shrink_ratio
+        self.thresh_min = thresh_min
+        self.thresh_max = thresh_max
+
+    def __call__(self, data: dict) -> dict:
+        """
+        从scales中随机选择一个尺度，对图片和文本框进行缩放
+        :param data: {'img':,'text_polys':,'texts':,'ignore_tags':}
+        :return:
+        """
+        im = data['img']
+        text_polys = data['text_polys']
+        ignore_tags = data['ignore_tags']
+
+        canvas = np.zeros(im.shape[:2], dtype=np.float32)
+        mask = np.zeros(im.shape[:2], dtype=np.float32)
+        gt1 = np.zeros(im.shape[:2], dtype=np.float32)
+        gt2 = np.zeros(im.shape[:2], dtype=np.float32)
+
+        for i in range(len(text_polys)):
+            if ignore_tags[i]:
+                continue
+            polygon = text_polys[i]
+            shrinked = shrink_polygon_pyclipper(polygon, self.shrink_ratio)
+            cv2.fillPoly(mask, polygon.astype(np.int32)[np.newaxis, :, :], 1.0)
+            cv2.fillPoly(gt2, [shrinked.astype(np.int32)], 0.3)
+            gt1 = 0.3 + gt2
+            canvas = np.where(canvas < gt1, gt1, canvas)
+
+            # self.draw_border_map(text_polys[i], canvas, mask=mask)
+        # canvas = canvas * (self.thresh_max - self.thresh_min) + self.thresh_min
+        data['threshold_map'] = canvas
+        data['threshold_mask'] = mask
+        return data
+
+
 class MakeBorderMap():
     def __init__(self, shrink_ratio=0.4, thresh_min=0.3, thresh_max=0.7):
         self.shrink_ratio = shrink_ratio

@@ -4,6 +4,86 @@ import cv2
 import numpy as np
 
 
+def resizeAndPad(img, size, padColor=0):
+    h, w = img.shape[:2]
+    sh, sw = size
+
+    # interpolation method
+    if h > sh or w > sw:  # shrinking image
+        interp = cv2.INTER_AREA
+    else:  # stretching image
+        interp = cv2.INTER_CUBIC
+
+    # aspect ratio of image
+    aspect = w / h  # if on Python 2, you might need to cast as a float: float(w)/h
+
+    # compute scaling and pad sizing
+    if aspect > 1:  # horizontal image
+        new_w = sw
+        new_h = np.round(new_w / aspect).astype(int)
+        # pad_vert = (sh-new_h)/2
+        # pad_top, pad_bot = np.floor(pad_vert).astype(int), np.ceil(pad_vert).astype(int)
+        pad_vert = (sh - new_h)
+        pad_top = 0
+        pad_bot = np.ceil(pad_vert).astype(int)
+        pad_left, pad_right = 0, 0
+    elif aspect < 1:  # vertical image
+        new_h = sh
+        new_w = np.round(new_h * aspect).astype(int)
+        # pad_horz = (sw-new_w)/2
+        # pad_left, pad_right = np.floor(pad_horz).astype(int), np.ceil(pad_horz).astype(int)
+        pad_horz = (sw - new_w)
+        pad_left = 0
+        pad_right = np.ceil(pad_horz).astype(int)
+        pad_top, pad_bot = 0, 0
+    else:  # square image
+        new_h, new_w = sh, sw
+        pad_left, pad_right, pad_top, pad_bot = 0, 0, 0, 0
+
+    # set pad color
+    if len(img.shape) is 3 and not isinstance(padColor,
+                                              (list, tuple, np.ndarray)):  # color image but only one color provided
+        padColor = [padColor] * 3
+
+    # scale and pad
+    scaled_img = cv2.resize(img, (new_w, new_h), interpolation=interp)
+    scaled_img = cv2.copyMakeBorder(scaled_img, pad_top, pad_bot, pad_left, pad_right, borderType=cv2.BORDER_CONSTANT,
+                                    value=padColor)
+
+    return scaled_img, max(new_h / h, new_w / w)
+
+
+class ResizeAndPad():
+    def __init__(self, size=(640, 640), keep_ratio=True):
+        self.size = size
+        self.keep_ratio = keep_ratio
+
+    def __call__(self, data: dict) -> dict:
+        im = data['img']
+        text_polys = data['text_polys']
+        ignore_tags = data['ignore_tags']
+        texts = data['texts']
+
+        img, ratio = resizeAndPad(im, self.size)
+
+        text_polys_crop = []
+        ignore_tags_crop = []
+        texts_crop = []
+        for poly, text, tag in zip(text_polys, texts, ignore_tags):
+            poly = (poly * ratio).tolist()
+
+            text_polys_crop.append(np.array(poly))
+            ignore_tags_crop.append(tag)
+            texts_crop.append(text)
+
+        data['img'] = img
+        # data['text_polys'] = np.float32(text_polys_crop)
+        data['text_polys'] = text_polys_crop
+        data['ignore_tags'] = ignore_tags_crop
+        data['texts'] = texts_crop
+        return data
+
+
 # random crop algorithm similar to https://github.com/argman/EAST
 class EastRandomCropData():
     def __init__(self, size=(640, 640), max_tries=50, min_crop_side_ratio=0.1, require_original_image=False, keep_ratio=True):
@@ -48,11 +128,13 @@ class EastRandomCropData():
         for poly, text, tag in zip(text_polys, texts, ignore_tags):
             poly = ((poly - (crop_x, crop_y)) * scale).tolist()
             if not self.is_poly_outside_rect(poly, 0, 0, w, h):
-                text_polys_crop.append(poly)
+                # text_polys_crop.append(poly)
+                text_polys_crop.append(np.array(poly))
                 ignore_tags_crop.append(tag)
                 texts_crop.append(text)
         data['img'] = img
-        data['text_polys'] = np.float32(text_polys_crop)
+        # data['text_polys'] = np.float32(text_polys_crop)
+        data['text_polys'] = text_polys_crop
         data['ignore_tags'] = ignore_tags_crop
         data['texts'] = texts_crop
         return data
@@ -154,9 +236,9 @@ class PSERandomCrop():
         self.size = size
 
     def __call__(self, data):
-        imgs = data['imgs']
+        imgs = data['img']
 
-        h, w = imgs[0].shape[0:2]
+        h, w = imgs.shape[0:2]
         th, tw = self.size
         if w == tw and h == th:
             return imgs
@@ -186,10 +268,10 @@ class PSERandomCrop():
             j = random.randint(0, w - tw)
 
         # return i, j, th, tw
-        for idx in range(len(imgs)):
-            if len(imgs[idx].shape) == 3:
-                imgs[idx] = imgs[idx][i:i + th, j:j + tw, :]
-            else:
-                imgs[idx] = imgs[idx][i:i + th, j:j + tw]
-        data['imgs'] = imgs
+
+        if len(imgs.shape) == 3:
+            imgs = imgs[i:i + th, j:j + tw, :]
+        else:
+            imgs = imgs[i:i + th, j:j + tw]
+        data['img'] = imgs
         return data

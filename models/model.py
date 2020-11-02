@@ -26,11 +26,11 @@ class Model(nn.Module):
         self.head = build_head(head_type, in_channels=self.neck.out_channels, **model_config.head)
         self.name = f'{backbone_type}_{neck_type}_{head_type}'
 
-    def forward(self, x):
+    def forward(self, x, thred, is_thred=False, is_binary=True):
         _, _, H, W = x.size()
         backbone_out = self.backbone(x)
         neck_out = self.neck(backbone_out)
-        y = self.head(neck_out)
+        y = self.head(neck_out, thred, is_thred=is_thred, is_binary=is_binary)
         y = F.interpolate(y, size=(H, W), mode='bilinear', align_corners=True)
         return y
 
