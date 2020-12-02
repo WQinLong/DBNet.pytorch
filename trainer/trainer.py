@@ -12,6 +12,35 @@ from utils import WarmupPolyLR, runningScore, cal_text_score
 import cv2
 import numpy as np
 
+import nni
+from nni.compression.torch import LevelPruner, SlimPruner, FPGMPruner, L1FilterPruner, \
+    L2FilterPruner, AGPPruner, ActivationMeanRankFilterPruner, ActivationAPoZRankFilterPruner
+
+prune_config = {
+    'level': {
+        'dataset_name': 'mnist',
+        'model_name': 'naive',
+        'pruner_class': FPGMPruner,
+        'config_list': [{
+            'sparsity': 0.5,
+            'op_types': ['Conv2d'],
+        }]
+    }
+}
+
+
+def create_pruner(model, pruner_name='level', optimizer=None, dependency_aware=False, dummy_input=None):
+    pruner_class = prune_config[pruner_name]['pruner_class']
+    config_list = prune_config[pruner_name]['config_list']
+    kw_args = {}
+    if dependency_aware:
+        print('Enable the dependency_aware mode')
+        # note that, not all pruners support the dependency_aware mode
+        kw_args['dependency_aware'] = True
+        kw_args['dummy_input'] = dummy_input
+    pruner = pruner_class(model, config_list, optimizer, **kw_args)
+    return pruner
+
 
 class Trainer(BaseTrainer):
     def __init__(self, config, model, criterion, train_loader, validate_loader, metric_cls, logger=None,
@@ -38,6 +67,17 @@ class Trainer(BaseTrainer):
                     len(self.train_loader.dataset), self.train_loader_len, len(self.validate_loader.dataset), len(self.validate_loader)))
         else:
             self.logger_info('train dataset has {} samples,{} in dataloader'.format(len(self.train_loader.dataset), self.train_loader_len))
+
+        if self.config['nni']['flag']:
+            dummy_input = next(iter(self.train_loader))
+            dummy_input = dummy_input['img'].to(self.device)
+            self.pruner = self._initialize('nni', nni.compression.torch, self.model, optimizer=self.optimizer,
+                                           dependency_aware=False,
+                                           dummy_input=dummy_input)
+            # dummy_input = next(iter(self.train_loader))
+            # dummy_input = dummy_input['img'].to(self.device)
+            # self.pruner = create_pruner(self.model, 'level', self.optimizer, False, dummy_input)
+            self.model = self.pruner.compress()
 
     def _train_epoch(self, epoch):
         self.model.train()
@@ -157,6 +197,7 @@ class Trainer(BaseTrainer):
                                                               box_thresh=self.config['post_processing']['args'][
                                                                   'box_thresh'])
                 raw_metrics.append(raw_metric)
+
         metrics = self.metric_cls.gather_measure(raw_metrics)
         self.logger_info('FPS:{}'.format(total_frame / total_time))
         return metrics['recall'].avg, metrics['precision'].avg, metrics['fmeasure'].avg
@@ -169,6 +210,8 @@ class Trainer(BaseTrainer):
             self.epoch_result['lr']))
         net_save_path = '{}/model_latest.pth'.format(self.checkpoint_dir)
         net_save_path_best = '{}/model_best.pth'.format(self.checkpoint_dir)
+        pruner_model_path = '{}/pruner_model.pth'.format(self.checkpoint_dir)
+        pruner_mask_path = '{}/pruner_mask.pth'.format(self.checkpoint_dir)
 
         if self.config['local_rank'] == 0:
             self._save_checkpoint(self.epoch_result['epoch'], net_save_path)
@@ -203,6 +246,8 @@ class Trainer(BaseTrainer):
                 import shutil
                 shutil.copy(net_save_path, net_save_path_best)
                 self.logger_info("Saving current best: {}".format(net_save_path_best))
+                if self.config['nni']['flag']:
+                    self.pruner.export_model(model_path=pruner_model_path, mask_path=pruner_mask_path)
             else:
                 self.logger_info("Saving checkpoint: {}".format(net_save_path))
 

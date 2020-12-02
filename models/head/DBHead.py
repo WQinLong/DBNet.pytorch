@@ -22,9 +22,9 @@ class DBHead(nn.Module):
         self.thresh = self._init_thresh(in_channels)
         self.thresh.apply(self.weights_init)
 
-    def forward(self, x, thred, is_thred=False, is_binary=False):
+    def forward(self, x, thred=None, is_thred=False, is_binary=False):
         shrink_maps = self.binarize(x)
-        if is_thred:
+        if is_thred and thred:
             threshold_maps = thred.unsqueeze(1)
         else:
             threshold_maps = self.thresh(x)

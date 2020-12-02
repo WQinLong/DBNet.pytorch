@@ -3,10 +3,11 @@
 # @Author  : zhoujun
 import copy
 from .model import Model
+from .model_nni import ModelNNI
 from .losses import build_loss
 
 __all__ = ['build_loss', 'build_model']
-support_model = ['Model']
+support_model = ['Model', 'ModelNNI']
 
 
 def build_model(config):

@@ -1,0 +1,107 @@
+name: DBNet_opensource_nni
+base: ['config/opensource.yaml']
+evolve:
+  flag: False
+  save_path: ''
+notest: False
+nni:
+  flag: True
+  type: FPGMPruner
+  args:
+    config_list: [{'sparsity': 0.5,'op_types': ['Conv2d'],
+                   'op_names': ['conv1', 'layer1.0.conv1', 'layer1.0.conv2',
+                                'layer1.1.conv1', 'layer1.1.conv2',
+                                'layer2.0.conv1', 'layer2.0.conv2',
+                                'layer2.1.conv1', 'layer2.1.conv2',
+                                'layer3.0.conv1', 'layer3.0.conv2',
+                                'layer3.1.conv1', 'layer3.1.conv2',
+                                'layer3.0.downsample.0',
+                                'layer4.0.conv1', 'layer4.0.conv2',
+                                'layer4.0.downsample.0',
+                                'layer4.1.conv1', 'layer4.1.conv2',
+                   ]}]
+arch:
+  type: ModelNNI
+  is_binary: True
+  is_thred: False
+  backbone:
+    type: resnet18
+    pretrained: true
+  neck:
+    type: FPN
+    inner_channels: 256
+  head:
+    type: DBHead
+    out_channels: 2
+    k: 50
+post_processing:
+  type: SegDetectorRepresenter
+  args:
+    thresh: 0.3
+    box_thresh: 0.7
+    max_candidates: 1000
+    unclip_ratio: 1.5 # from paper
+metric:
+  type: QuadMetric
+  args:
+    is_output_polygon: false
+loss:
+  type: DBLoss
+  alpha: 1
+  beta: 10
+  ohem_ratio: 3
+optimizer:
+  type: Adam
+  args:
+    lr: 0.001
+    weight_decay: 0
+    amsgrad: true
+lr_scheduler:
+  type: WarmupPolyLR
+  args:
+    warmup_epoch: 3
+#lr_scheduler:
+#  type: StepLR
+#  args:
+#    step_size: 4
+#    gamma: 0.9
+trainer:
+  seed: 2
+  epochs: 40
+  log_iter: 10
+  show_images_iter: 50
+  #  resume_checkpoint: 'output/DBNet_lsvt_border2_thred_resnet18_FPN_DBHead/checkpoint/model_latest.pth'
+  resume_checkpoint: ''
+  finetune_checkpoint: 'output/DBNet_opensource_nni_pretrain_resnet18_fpn_db/checkpoint/model_latest.pth'
+  output_dir: output
+  tensorboard: False
+dataset:
+  train:
+    dataset:
+      args:
+        data_path:
+          - /apps/home/wuql/datasets/opensource/db/train.txt
+        img_mode: RGB
+    loader:
+      batch_size: 12
+      shuffle: True
+      pin_memory: true
+      num_workers: 16
+      collate_fn: ''
+  validate:
+    dataset:
+      args:
+        data_path:
+          - /apps/home/wuql/datasets/opensource/db/test.txt
+        pre_processes:
+          - type: ResizeShortSize
+            args:
+              short_size: 736
+              resize_text_polys: false
+        img_mode: RGB
+    loader:
+      batch_size: 1
+      shuffle: False
+      pin_memory: false
+      num_workers: 16
+      collate_fn: ICDARCollectFN

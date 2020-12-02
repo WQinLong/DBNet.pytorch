@@ -12,7 +12,6 @@ import numpy as np
 import random
 import time
 import yaml
-from utils import setup_logger
 
 
 def init_args():
@@ -60,6 +59,7 @@ def main(config):
     from trainer import Trainer
     from post_processing import get_post_processing
     from utils import get_metric
+    from utils import setup_logger
     if torch.cuda.device_count() > 1:
         torch.cuda.set_device(args.local_rank)
         torch.distributed.init_process_group(backend="nccl", init_method="env://", world_size=torch.cuda.device_count(), rank=args.local_rank)
@@ -74,6 +74,8 @@ def main(config):
 
     if config['local_rank'] == 0:
         save_dir = os.path.join(config['trainer']['output_dir'], config['name'] + '_' + model.name)
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
         logger = setup_logger(os.path.join(save_dir, 'train.log'))
 
     if 'evolve' in config.keys() and config['evolve']['flag'] and not config['distributed']:
